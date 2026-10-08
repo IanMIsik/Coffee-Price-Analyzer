@@ -88,8 +88,12 @@ FIRST_RUN=0
 if [ "$FIRST_RUN" -eq 1 ] || [ "$RECONFIGURE" -eq 1 ]; then
   say "Setup questions (press Enter to accept a default)"
   [ -n "$DUCKDNS_SUBDOMAIN" ] || ask DUCKDNS_SUBDOMAIN "DuckDNS name (e.g. mycoffee or mycoffee.duckdns.org; empty to skip DuckDNS)"
-  if [ -n "$DUCKDNS_SUBDOMAIN" ] && [ -z "$DUCKDNS_TOKEN" ]; then
-    ask DUCKDNS_TOKEN "DuckDNS token (hidden)" "" secret
+  if [ -n "$DUCKDNS_SUBDOMAIN" ]; then
+    for _try in 1 2 3; do
+      [ -z "$DUCKDNS_TOKEN" ] || break
+      ask DUCKDNS_TOKEN "DuckDNS token (input is hidden: paste it, then press Enter)" "" secret
+      if [ -n "$DUCKDNS_TOKEN" ]; then echo "  received ${#DUCKDNS_TOKEN} characters"; else echo "  nothing received, try again"; fi
+    done
   fi
   [ -n "$APP_USER" ] || ask APP_USER "Dashboard login name" "admin"
   if [ -z "$APP_PASSWORD" ]; then
@@ -99,6 +103,12 @@ if [ "$FIRST_RUN" -eq 1 ] || [ "$RECONFIGURE" -eq 1 ]; then
 fi
 APP_USER="${APP_USER:-admin}"
 DUCKDNS_SUBDOMAIN="${DUCKDNS_SUBDOMAIN%.duckdns.org}"
+
+if [ -n "$DUCKDNS_SUBDOMAIN" ] && [ -z "$DUCKDNS_TOKEN" ]; then
+  echo "No DuckDNS token received. Run it again, or pass the token directly:" >&2
+  echo "  DUCKDNS_SUBDOMAIN=${DUCKDNS_SUBDOMAIN} DUCKDNS_TOKEN=your-token ./deploy/setup.sh" >&2
+  exit 1
+fi
 
 GENERATED=0
 if [ -z "$HASH" ]; then
