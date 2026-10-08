@@ -15,7 +15,7 @@ Open http://localhost:8100. Env vars: `PA_POLL_MINUTES` (default 30), `PA_DB` (d
 
 ## Deploy
 
-See [DEPLOY.md](DEPLOY.md): a near-automatic AWS EC2 free-tier setup (paste one script into "User data"), plus manual
+See [DEPLOY.md](DEPLOY.md): on an Ubuntu server, `git clone` the repo and run `./deploy/setup.sh` (DuckDNS, HTTPS, login, auto-start, nightly update), plus manual
 options. A `Dockerfile` and `docker-compose.yml` are included: `docker compose up -d` serves the app on
 http://localhost:8100.
 

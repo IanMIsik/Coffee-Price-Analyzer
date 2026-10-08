@@ -7,72 +7,79 @@ rebuilds and updates keep your data and settings.
 > Never open port 8100 to the internet. The setups below put HTTPS and a password in front of it (Caddy), or keep it
 > private behind an SSH tunnel.
 
-## Quick start: free tier, almost hands-off (recommended)
+## Quick start: one script (recommended)
 
-You do four things; the instance does the rest on its own. It installs Docker, builds the app, gets an HTTPS
-certificate, generates a login, restarts itself after any reboot, and updates itself nightly from GitHub.
-No SSH, domain or command line on the server is needed.
+Everything is done by **`deploy/setup.sh`**. It installs Docker if needed, asks a few questions the first time, keeps
+your DuckDNS address pointed at the server, gets an HTTPS certificate, starts the app, and makes it start by itself
+after a reboot. Running it again is safe: it keeps your settings and just rebuilds with the latest code.
 
-> Tested: the Docker image builds and runs healthy on a laptop, and the scripts pass syntax checks. The full
-> run on a real EC2 instance has not been tested, so if something differs, the troubleshooting notes at the bottom
-> and the setup log (step 4) will show why.
+> Tested: the Docker image builds and runs healthy on a laptop, the settings step of the script was run for real
+> (first run, re-run, and fallback), and all scripts pass syntax checks. The full run on a real EC2 instance has not
+> been tested, so if something differs, the troubleshooting notes at the bottom will help.
 
-**1. Put the code on GitHub** (once). Create an empty repository named `price-analyzer` on github.com. Public is the
-simplest: there are no secrets in the code (the database and `.env` are git-ignored). Then, in the `price-analyzer` folder:
+**You need:** an EC2 instance running Ubuntu 24.04 (choose the type marked *Free tier eligible*) with ports **80** and
+**443** open to the internet and **22** open to your IP, plus a DuckDNS name and its token from duckdns.org.
+
+**1. Connect and run the script** (first time):
 
 ```bash
-git init -b main
-git add .
-git commit -m "Coffee price analyzer"
-git remote add origin https://github.com/YOUR-USER/price-analyzer.git
-git push -u origin main
+git clone https://github.com/IanMIsik/Coffee-Price-Analyzer.git
+cd Coffee-Price-Analyzer
+./deploy/setup.sh
 ```
 
-**2. Edit one line.** Open `deploy/user-data.sh` and set `REPO_URL` to your repository's URL (and push that change).
+It asks:
 
-**3. Launch the instance.** AWS console, **EC2 → Launch instance**:
+| Question | Answer |
+|---|---|
+| DuckDNS name | e.g. `mycoffee` (or `mycoffee.duckdns.org`). Press Enter to skip and get a free `<ip>.sslip.io` address instead. |
+| DuckDNS token | from the top of your duckdns.org page (typed hidden) |
+| Dashboard login name | e.g. `admin` |
+| Dashboard password | choose one, or press Enter to generate one (shown once at the end) |
 
-- **AMI:** Ubuntu Server 24.04 LTS
-- **Instance type:** the one marked **Free tier eligible** (usually `t2.micro` or `t3.micro`)
-- **Key pair:** *Proceed without a key pair* is fine. You can create one later if you want SSH access.
-- **Network settings:** allow **HTTPS (443)** and **HTTP (80)** from anywhere. Leave SSH off, or allow it from *My IP* only.
-- **Advanced details → User data:** paste the whole of `deploy/user-data.sh`.
-- Launch.
+When it finishes it prints the address, for example `https://mycoffee.duckdns.org`. Allow a minute for the HTTPS
+certificate, and a minute or two for the first load to fetch the sales history.
 
-**4. Wait about 5–10 minutes**, then read your address and login: select the instance → **Actions → Monitor and
-troubleshoot → Get system log**, and scroll to the bottom:
+**2. Updating later** (after you or Claude push new code):
 
+```bash
+cd ~/Coffee-Price-Analyzer
+git pull
+./deploy/setup.sh
 ```
- PRICE ANALYZER READY
- Address : https://3-250-10-20.sslip.io
- Login   : admin / <generated password>
+
+It does not ask the questions again. To change the DuckDNS name or the password, add `--reconfigure`.
+
+**Already ran an earlier automatic setup on this server?** The new script takes over the same containers and data
+(they share the project name `price-analyzer`). If you have a leftover copy in `/opt/price-analyzer`, delete it after:
+`sudo rm -rf /opt/price-analyzer`.
+
+**What runs without you doing anything**
+
+- The app checks the exchange for a new sale every 30 minutes and the news every 12 hours, around the clock.
+  The dashboard in your browser refreshes its numbers every 5 minutes and shows a banner when a new sale appears.
+- A DuckDNS updater runs every 5 minutes so the name always points at the server, even if the instance gets a new IP
+  after a stop and start. That means you do not need an Elastic IP.
+- The app starts after a reboot, and your data is kept in a Docker volume.
+- At 03:30 UTC (06:30 Nairobi time) the server pulls the latest code from GitHub and rebuilds if it changed.
+
+**Useful commands** (in the `Coffee-Price-Analyzer` folder):
+
+```bash
+sudo docker compose ps                  # status and health
+sudo docker compose logs -f app         # watch it check for new sales
+sudo ./deploy/setup.sh --reconfigure    # change the DuckDNS name or the password
 ```
 
-Open the address and sign in. Your browser may need a minute while the certificate is issued. The first page load
-fetches the sales history, which takes another minute.
+**Alternative: a brand-new instance that sets itself up.** Paste `deploy/user-data.sh` (with your DuckDNS values filled
+in at the top) into **Launch instance → Advanced details → User data**. It clones the repository and runs the same
+`setup.sh`. The generated password appears in **Actions → Monitor and troubleshoot → Get system log**. Note that
+user data is visible to anyone with access to the instance in your AWS account, including the DuckDNS token you put in it.
 
-**What you get without doing anything else**
+**Free tier:** AWS's free offer has changed over time (a 12-month trial on older accounts, a credit-based plan on newer
+ones), and AWS bills hourly for public IPv4 addresses. Check **Billing → Free tier** to see what your account includes.
 
-- Checks the exchange every 30 minutes and the news every 12 hours, around the clock.
-- Starts by itself after a reboot, and your data is kept in a Docker volume.
-- Pulls the latest code from GitHub every night at 03:30 UTC (06:30 Nairobi time) and rebuilds if it changed.
-  To ship a change, just `git push`. To update right now: connect and run `sudo /opt/price-analyzer/deploy/update.sh`.
-
-**Two things to know**
-
-- **The address changes if the instance is stopped and started** (it gets a new public IP). The app re-points itself
-  at boot, but your bookmark breaks. To keep one address, allocate an **Elastic IP** (EC2 → Elastic IPs → Allocate →
-  Associate with the instance) *before* you rely on the address, then reboot the instance once. AWS bills for public
-  IPv4 addresses by the hour, and the free offer covers a limited amount, so check **Billing → Free tier** in your account.
-  The free tier itself has changed over time (a 12-month trial on older accounts, a credit-based plan on newer ones),
-  so confirm what your account includes before leaving it running.
-- **The free `*.sslip.io` name is a shared public service.** If a certificate is ever refused, use your own domain:
-  create an A record to the Elastic IP, set `CUSTOM_DOMAIN="prices.yourdomain.com"` in `user-data.sh`, and launch again.
-
-**Change the password later** (needs SSH): run `sudo docker run --rm caddy:2 caddy hash-password --plaintext 'new'`,
-paste the result into `BASIC_AUTH_HASH='...'` in `/opt/price-analyzer/.env`, then `sudo systemctl restart price-analyzer`.
-
-**Delete everything:** terminate the instance and release the Elastic IP (if you made one).
+**Delete everything:** terminate the instance in the EC2 console (and release any Elastic IP you created).
 
 ---
 
@@ -209,11 +216,13 @@ the security group and key pair if you no longer need them.
 
 ## Troubleshooting
 
-**Quick start setup (user data)**
+**Quick start (setup.sh)**
 
-- **No "READY" message after 15 minutes:** the full log is in the same system log, and on the server in
-  `/var/log/price-analyzer-setup.log` and `/var/log/cloud-init-output.log`. The usual cause is a wrong `REPO_URL`
-  (a private repository cannot be cloned without a token; make it public).
+- **`git clone` asks for a password:** the repository is private. Make it public on GitHub, or clone with a token.
+- **Certificate error or page not loading:** DuckDNS must point at this server (`nslookup yourname.duckdns.org` should
+  show the instance's public IP; check the token and name with `./deploy/duckdns-update.sh`, which prints OK or KO),
+  and ports 80 and 443 must be open in the security group.
+- **User-data setup did not finish:** read `/var/log/price-analyzer-setup.log` on the server.
 - **Page does not load but the log says READY:** wait a minute for the certificate, and check the security group allows
   ports 80 and 443 from anywhere.
 - **Browser warns about the certificate:** the address changed (instance restarted without an Elastic IP). Use the new
