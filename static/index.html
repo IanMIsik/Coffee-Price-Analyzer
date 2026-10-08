@@ -1,0 +1,386 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Coffee Price Analyzer</title>
+<style>
+  :root { --bg:#faf7f2; --card:#fff; --ink:#2b2118; --mute:#7a6a5a; --line:#e6ddd0; --accent:#6f4e37; --aa:#2f6f4f; --ab:#b5651d; --c:#4a6fa5; --up:#2f6f4f; --down:#b3402f; --band:rgba(111,78,55,.15); --shadow:0 4px 14px rgba(0,0,0,.12); }
+  @media (prefers-color-scheme: dark) { :root { --bg:#1b1511; --card:#261e18; --ink:#f1e8dc; --mute:#a8978a; --line:#3a2e25; --accent:#d2a679; --aa:#6fc296; --ab:#e0a05c; --c:#86a8d8; --up:#6fc296; --down:#ef8f7e; --band:rgba(210,166,121,.18); --shadow:0 4px 14px rgba(0,0,0,.5); } }
+  * { box-sizing: border-box; }
+  body { margin:0; background:var(--bg); color:var(--ink); font:15px/1.5 system-ui, sans-serif; }
+  main { max-width:1040px; margin:0 auto; padding:16px; padding-left:max(16px, env(safe-area-inset-left)); padding-right:max(16px, env(safe-area-inset-right)); padding-bottom:max(16px, env(safe-area-inset-bottom)); }
+  h1 { font-size:22px; margin:8px 0 2px; } h2 { font-size:14px; margin:0 0 10px; color:var(--mute); text-transform:uppercase; letter-spacing:.04em; }
+  .sub, .msg { color:var(--mute); font-size:13px; }
+  .card { background:var(--card); border:1px solid var(--line); border-radius:10px; padding:16px; margin-top:14px; }
+  .grid2 { display:grid; grid-template-columns:repeat(auto-fit,minmax(min(100%,320px),1fr)); gap:14px; margin-top:14px; } .grid2 .card { margin-top:0; min-width:0; }
+  .tiles { display:grid; grid-template-columns:repeat(auto-fit,minmax(190px,1fr)); gap:12px; }
+  .tile .v { font-size:26px; font-weight:700; color:var(--accent); } .tile .l { color:var(--mute); font-size:13px; } .tile .n { font-size:12px; color:var(--mute); }
+  .up { color:var(--up); } .down { color:var(--down); }
+  .badge { display:inline-block; padding:1px 8px; border-radius:99px; font-size:12px; border:1px solid var(--line); color:var(--mute); white-space:nowrap; }
+  .badge.est { border-style:dashed; }
+  .banner { background:var(--accent); color:var(--bg); border-radius:8px; padding:10px 14px; margin-top:12px; display:none; }
+  .read li { margin:4px 0; }
+  table { width:100%; border-collapse:collapse; font-size:14px; } th,td { text-align:right; padding:6px 8px; border-bottom:1px solid var(--line); white-space:nowrap; }
+  th:first-child,td:first-child { text-align:left; position:sticky; left:0; background:var(--card); } th { color:var(--mute); font-weight:600; }
+  .scroll { overflow-x:auto; }
+  form.settings { display:grid; grid-template-columns:repeat(auto-fit,minmax(220px,1fr)); gap:12px; }
+  label { font-size:13px; color:var(--mute); display:block; } input { width:100%; min-height:44px; padding:8px 10px; border:1px solid var(--line); border-radius:6px; background:var(--bg); color:var(--ink); font-size:16px; }
+  button, a.btn { display:inline-flex; align-items:center; min-height:44px; padding:8px 14px; border:0; border-radius:6px; background:var(--accent); color:var(--bg); font-weight:600; cursor:pointer; text-decoration:none; font-size:14px; }
+  .ghost { background:transparent !important; color:var(--accent) !important; border:1px solid var(--accent) !important; }
+  .row { display:flex; gap:10px; align-items:center; flex-wrap:wrap; justify-content:space-between; }
+  .chips { display:flex; gap:6px; flex-wrap:wrap; }
+  .chip, .lg { display:inline-flex; align-items:center; gap:6px; min-height:32px; padding:3px 11px; border:1px solid var(--line); border-radius:99px; background:transparent; color:var(--ink); font-size:12px; font-weight:500; cursor:pointer; }
+  .chip[aria-pressed=true] { background:var(--accent); color:var(--bg); border-color:var(--accent); }
+  .lg i { width:10px; height:10px; border-radius:2px; display:inline-block; } .lg[aria-pressed=false] { opacity:.5; text-decoration:line-through; }
+  .legend { display:flex; gap:6px; flex-wrap:wrap; margin:6px 0 8px; }
+  .chartwrap { position:relative; } svg { max-width:100%; height:auto; display:block; touch-action:pan-y; user-select:none; -webkit-user-select:none; }
+  svg:focus-visible { outline:2px solid var(--accent); outline-offset:2px; border-radius:4px; }
+  .tip { position:absolute; top:6px; pointer-events:none; background:var(--card); border:1px solid var(--line); border-radius:8px; padding:8px 10px; font-size:12px; line-height:1.45; box-shadow:var(--shadow); width:210px; z-index:3; display:none; }
+  .tip b.d { font-size:13px; display:block; } .tip .r { display:flex; justify-content:space-between; gap:10px; } .tip .r span:first-child { color:var(--mute); } .tip .s { color:var(--mute); margin-top:4px; }
+  td.heat { text-align:center; } td.base { outline:2px solid var(--accent); outline-offset:-2px; font-weight:700; }
+  .calc { display:flex; gap:12px; flex-wrap:wrap; align-items:end; } .calc > div { flex:1; min-width:150px; }
+  .out { font-size:20px; font-weight:700; color:var(--accent); }
+  a { color:var(--accent); }
+  @media (max-width: 560px) {
+    main { padding-top:10px; padding-bottom:24px; } h1 { font-size:20px; }
+    .card { padding:12px; border-radius:8px; }
+    .tiles { grid-template-columns:1fr 1fr; gap:10px; } .tile .v { font-size:20px; } .tile .n { font-size:11px; }
+    .row > div:last-child:not(.chips) { display:flex; gap:8px; width:100%; } .row > div:last-child:not(.chips) > * { flex:1; justify-content:center; }
+    table { font-size:13px; } th, td { padding:6px 6px; }
+    .out { font-size:18px; } .calc > div { min-width:100%; } .read { padding-left:18px; }
+  }
+</style>
+</head>
+<body>
+<main>
+  <div class="row">
+    <div><h1>Coffee Price Analyzer</h1><div class="sub" id="status">Loading…</div></div>
+    <div><a class="btn ghost" href="/api/export.csv">Export CSV</a> <button class="ghost" id="refresh">Check for new sale</button></div>
+  </div>
+  <div class="banner" id="banner"></div>
+
+  <div class="card"><h2 id="latestTitle">Latest estimate</h2><div class="tiles" id="tiles"></div></div>
+
+  <div class="card"><h2>Market read</h2><ul class="read" id="read"></ul><div class="msg" id="gaps"></div></div>
+
+  <div class="card">
+    <div class="row"><h2 style="margin:0">Cherry price, KES per kg</h2>
+      <div class="chips" id="ranges" role="group" aria-label="Date range"></div></div>
+    <div class="legend" id="lgCherry"></div>
+    <div class="chartwrap" id="cCherry"></div>
+    <div class="msg">Hover, tap or use ← → keys to read any sale. Hollow dots are estimated from the market average (older sales); solid dots come from AA/AB/C averages.</div>
+  </div>
+
+  <div class="grid2">
+    <div class="card"><h2>Grade prices, USD / 50 kg</h2><div class="legend" id="lgGrades"></div><div class="chartwrap" id="cGrades"></div></div>
+    <div class="card"><h2>Grade spreads, USD</h2><div class="legend" id="lgSpread"></div><div class="chartwrap" id="cSpread"></div>
+      <div class="msg">A widening AB − C gap means buyers are paying more for quality. A narrowing one means the market is bidding up lower grades.</div></div>
+  </div>
+
+  <div class="grid2">
+    <div class="card"><h2>Bags offered by grade</h2><div class="legend" id="lgVol"></div><div class="chartwrap" id="cVol"></div><div class="msg">Volumes are only in the exchange’s own reports (from March 2026).</div></div>
+    <div class="card"><h2>Monthly average cherry price</h2><div class="scroll"><table id="monthly"></table></div></div>
+  </div>
+
+  <div class="grid2">
+    <div class="card"><h2>What if? Cherry KES/kg at the latest sale</h2>
+      <div class="scroll"><table id="sens"></table></div>
+      <div class="msg">Rows change the USD/KES rate; columns change your deductions. Highlighted cell = your current settings.</div></div>
+    <div class="card"><h2>Payout calculator</h2>
+      <div class="calc"><div><label for="kg">Cherry delivered (kg)</label><input id="kg" type="number" value="1000" min="0"></div></div>
+      <p>At current estimate: <span class="out" id="payNow">–</span></p>
+      <p class="msg" id="payBand"></p>
+      <div id="breakeven" class="msg"></div></div>
+  </div>
+
+  <div class="card"><h2>Sale history</h2><div class="scroll"><table id="hist"></table></div></div>
+
+  <div class="card"><h2>Conversion settings</h2>
+    <form class="settings" id="settings">
+      <div><label>USD → KES rate</label><input name="usd_kes" type="number" step="0.01"></div>
+      <div><label>Green kg per 1 kg parchment</label><input name="green_per_parchment" type="number" step="0.01"></div>
+      <div><label>Cherry kg per 1 kg parchment</label><input name="cherry_per_parchment" type="number" step="0.1"></div>
+      <div><label>Deductions % (marketing, commission, levies)</label><input name="deduction_pct" type="number" step="0.1"></div>
+      <div><label>Processing cost, KES per kg parchment</label><input name="processing_cost_per_kg_parchment" type="number" step="0.1"></div>
+      <div style="align-self:end"><button type="submit">Save &amp; recalculate</button> <span class="msg" id="saved"></span></div>
+    </form>
+    <p class="msg">Method: simple average of AA, AB and C auction averages (USD / 50 kg clean coffee) × exchange rate → KES per kg clean × green yield × (1 − deductions) − processing = KES per kg parchment (×50 for a bag) ÷ cherry ratio = KES per kg cherry.
+    The defaults are placeholders, so set them to your own figures. The next-sale range uses the recent trend and past week-to-week swings. It is a rough guide, not a forecast.</p>
+    <p class="msg" id="method"></p>
+  </div>
+</main>
+<script>
+const $ = s => document.querySelector(s);
+const kes = n => n == null ? '–' : Number(n).toLocaleString('en-KE', {maximumFractionDigits: 2, minimumFractionDigits: 2});
+const kes0 = n => n == null ? '–' : Number(n).toLocaleString('en-KE', {maximumFractionDigits: 0});
+const usd = n => n == null ? '–' : Number(n).toFixed(2);
+const sgn = n => n == null ? '–' : (n > 0 ? '+' : '') + n.toFixed(2);
+const cls = n => n == null || n === 0 ? '' : n > 0 ? 'up' : 'down';
+const esc = s => String(s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const DAY = 864e5;
+const tOf = r => Date.parse(r.date + 'T00:00:00Z');
+const fd = (d, o) => new Date(d + 'T00:00:00Z').toLocaleDateString('en-GB', {timeZone: 'UTC', ...o});
+const dLong = d => fd(d, {weekday: 'short', day: 'numeric', month: 'short', year: 'numeric'});
+const dShort = d => fd(d, {day: 'numeric', month: 'short'});
+const dMid = d => fd(d, {day: 'numeric', month: 'short', year: 'numeric'});
+let A = null, P = null;
+const ui = { range: 'all', hidden: {} };       // hidden: chartId -> Set of series keys
+try { ui.range = localStorage.getItem('range') || 'all'; } catch (e) {}
+const hid = id => ui.hidden[id] || (ui.hidden[id] = new Set());
+
+const RANGES = [['1m', '1M', 31], ['3m', '3M', 92], ['6m', '6M', 183], ['1y', '1Y', 366], ['all', 'All', 0]];
+function inRange(rows) {
+  const days = (RANGES.find(r => r[0] === ui.range) || [])[2];
+  if (!days || !rows.length) return rows;
+  const cut = tOf(rows[rows.length - 1]) - days * DAY;
+  return rows.filter(r => tOf(r) >= cut);
+}
+
+function timeTicks(t0, t1, W) {
+  const span = (t1 - t0) / DAY, max = W < 420 ? 4 : 7, out = [];
+  if (span <= 70) {
+    const step = Math.max(1, Math.ceil(span / 7 / max)) * 7 * DAY;
+    for (let t = t0; t <= t1; t += step) out.push([t, dShort(new Date(t).toISOString().slice(0, 10))]);
+  } else {
+    const d0 = new Date(t0), months = Math.round(span / 30.4), step = Math.max(1, Math.ceil(months / max));
+    let y = d0.getUTCFullYear(), m = d0.getUTCMonth() + 1, first = true;
+    for (;;) {
+      const t = Date.UTC(y, m, 1); if (t > t1) break;
+      const dt = new Date(t), mon = dt.toLocaleDateString('en-GB', {month: 'short', timeZone: 'UTC'});
+      out.push([t, (first || dt.getUTCMonth() === 0) ? `${mon} ’${String(dt.getUTCFullYear()).slice(2)}` : mon]);
+      first = false; m += step; y += Math.floor(m / 12); m %= 12;
+    }
+  }
+  return out;
+}
+
+// Line segments that break where a value is missing.
+function path(pts) {
+  let d = '', pen = false;
+  for (const p of pts) { if (!p) { pen = false; continue; } d += (pen ? 'L' : 'M') + p[0].toFixed(1) + ' ' + p[1].toFixed(1); pen = true; }
+  return d;
+}
+
+// Shared crosshair + tooltip for any chart. xs: pixel x per row.
+function interact(wrap, svg, rows, xs, W, tipFn, dotsFn, H, T, B) {
+  const tip = document.createElement('div'); tip.className = 'tip'; tip.setAttribute('aria-live', 'polite'); wrap.appendChild(tip);
+  const NS = 'http://www.w3.org/2000/svg';
+  const g = document.createElementNS(NS, 'g'); g.setAttribute('pointer-events', 'none'); g.style.display = 'none';
+  const ln = document.createElementNS(NS, 'line'); ln.setAttribute('y1', T); ln.setAttribute('y2', H - B); ln.setAttribute('stroke', 'var(--mute)'); ln.setAttribute('stroke-dasharray', '3 3');
+  g.appendChild(ln); svg.appendChild(g);
+  let cur = -1;
+  function show(i) {
+    if (i < 0 || i >= rows.length) return;
+    cur = i; g.style.display = '';
+    ln.setAttribute('x1', xs[i]); ln.setAttribute('x2', xs[i]);
+    g.querySelectorAll('circle').forEach(c => c.remove());
+    for (const [y, color] of dotsFn(rows[i])) {
+      const c = document.createElementNS(NS, 'circle'); c.setAttribute('cx', xs[i]); c.setAttribute('cy', y); c.setAttribute('r', 5);
+      c.setAttribute('fill', 'var(--card)'); c.setAttribute('stroke', color); c.setAttribute('stroke-width', 2.5); g.appendChild(c);
+    }
+    tip.innerHTML = tipFn(rows[i], i); tip.style.display = 'block';
+    const w = tip.offsetWidth, scale = svg.getBoundingClientRect().width / W, x = xs[i] * scale;
+    tip.style.left = Math.max(0, Math.min(wrap.clientWidth - w, x > wrap.clientWidth / 2 ? x - w - 12 : x + 12)) + 'px';
+  }
+  function hide() { g.style.display = 'none'; tip.style.display = 'none'; cur = -1; }
+  function at(e) {
+    const rect = svg.getBoundingClientRect(), px = (e.clientX - rect.left) * (W / rect.width);
+    let best = 0; for (let i = 1; i < xs.length; i++) if (Math.abs(xs[i] - px) < Math.abs(xs[best] - px)) best = i;
+    show(best);
+  }
+  svg.addEventListener('pointermove', at);
+  svg.addEventListener('pointerdown', at);
+  svg.addEventListener('pointerleave', e => { if (e.pointerType === 'mouse') hide(); });
+  svg.addEventListener('keydown', e => {
+    if (e.key === 'ArrowLeft') show(cur < 0 ? rows.length - 1 : Math.max(0, cur - 1));
+    else if (e.key === 'ArrowRight') show(cur < 0 ? rows.length - 1 : Math.min(rows.length - 1, cur + 1));
+    else if (e.key === 'Home') show(0); else if (e.key === 'End') show(rows.length - 1);
+    else if (e.key === 'Escape') hide(); else return;
+    e.preventDefault();
+  });
+  svg.addEventListener('blur', hide);
+  document.addEventListener('pointerdown', e => { if (!wrap.contains(e.target)) hide(); });
+}
+
+// Time-scaled multi-line chart. o: {series[{k,name,c,get,w,dash,dots,hollow}], band, dec, zero, tip(r,i,band), label}
+function lineChart(id, rows, o) {
+  const wrap = $('#' + id); if (!wrap) return;
+  const W = Math.max(280, Math.round(wrap.clientWidth || 520)), H = o.h || (W < 420 ? 230 : 280), L = 46, R = 14, T = 12, B = 30;
+  const hidden = hid(id), vis = o.series.filter(s => !hidden.has(s.k));
+  const band = o.band && !hidden.has('band') ? o.band : null;
+  if (!rows.length) { wrap.innerHTML = '<p class="msg">No sales in this range.</p>'; return; }
+  const t0 = tOf(rows[0]), tLast = tOf(rows[rows.length - 1]), t1 = band ? tLast + 7 * DAY : tLast;
+  const vals = vis.flatMap(s => rows.map(s.get)).concat(band ? [band.low, band.high] : []).filter(v => v != null);
+  if (!vals.length) { wrap.innerHTML = '<p class="msg">Nothing to show with these lines hidden.</p>'; return; }
+  let lo = Math.min(...vals), hi = Math.max(...vals); const pad = (hi - lo) * .1 || 1; lo -= pad; hi += pad;
+  if (o.zero) lo = Math.min(lo, 0);
+  const X = t => L + (t1 === t0 ? (W - L - R) / 2 : (t - t0) * (W - L - R) / (t1 - t0)), Y = v => T + (hi - v) * (H - T - B) / (hi - lo);
+  const xs = rows.map(r => X(tOf(r)));
+  let s = `<svg viewBox="0 0 ${W} ${H}" width="${W}" height="${H}" role="img" tabindex="0" aria-label="${esc(o.label)}: ${rows.length} sales from ${dMid(rows[0].date)} to ${dMid(rows[rows.length - 1].date)}. Use arrow keys to inspect.">`;
+  for (let i = 0; i <= 4; i++) { const v = lo + (hi - lo) * i / 4, y = Y(v);
+    s += `<line x1="${L}" x2="${W - R}" y1="${y}" y2="${y}" stroke="var(--line)"/><text x="${L - 6}" y="${y + 4}" text-anchor="end" font-size="11" fill="var(--mute)">${v.toFixed(o.dec ?? 0)}</text>`; }
+  for (const [t, label] of timeTicks(t0, t1, W)) s += `<line x1="${X(t)}" x2="${X(t)}" y1="${H - B}" y2="${H - B + 4}" stroke="var(--mute)"/><text x="${X(t)}" y="${H - 8}" text-anchor="middle" font-size="11" fill="var(--mute)">${label}</text>`;
+  if (band) { const x = X(tLast + 7 * DAY);
+    s += `<rect x="${x - 9}" y="${Y(band.high)}" width="18" height="${Math.max(2, Y(band.low) - Y(band.high))}" fill="var(--band)" stroke="var(--accent)" stroke-dasharray="3 2"/><circle cx="${x}" cy="${Y(band.mid)}" r="3.5" fill="none" stroke="var(--accent)" stroke-width="2"/>`; }
+  for (const se of vis) {
+    s += `<path d="${path(rows.map(r => { const v = se.get(r); return v == null ? null : [X(tOf(r)), Y(v)]; }))}" fill="none" stroke="var(--${se.c})" stroke-width="${se.w || 2}" ${se.dash ? 'stroke-dasharray="5 3"' : ''} stroke-linejoin="round"/>`;
+    if (se.dots !== false) rows.forEach(r => { const v = se.get(r); if (v == null) return;
+      const hollow = se.hollow && se.hollow(r);
+      s += `<circle cx="${X(tOf(r))}" cy="${Y(v)}" r="${rows.length > 80 ? 2 : 3}" fill="${hollow ? 'var(--card)' : `var(--${se.c})`}" stroke="var(--${se.c})" stroke-width="${hollow ? 1.5 : 0}"/>`; });
+  }
+  wrap.innerHTML = s + '</svg>';
+  const svg = wrap.querySelector('svg');
+  interact(wrap, svg, rows, xs, W, (r, i) => o.tip(r, i, band && i === rows.length - 1 ? band : null),
+    r => vis.map(se => [se.get(r), se.c]).filter(([v]) => v != null).map(([v, c]) => [Y(v), `var(--${c})`]), H, T, B);
+}
+
+function barChart(id, rows, stacks) {
+  const wrap = $('#' + id); if (!wrap) return;
+  const hidden = hid(id), vis = stacks.filter(s => !hidden.has(s.k));
+  rows = rows.filter(r => r.bags);
+  if (!rows.length) { wrap.innerHTML = '<p class="msg">No volume data in this range.</p>'; return; }
+  const W = Math.max(280, Math.round(wrap.clientWidth || 520)), H = W < 420 ? 230 : 280, L = 46, R = 14, T = 12, B = 30;
+  const tot = r => vis.reduce((a, s) => a + (r.bags[s.k] || 0), 0), hi = Math.max(...rows.map(tot), 1);
+  const t0 = tOf(rows[0]) - 3.5 * DAY, t1 = tOf(rows[rows.length - 1]) + 3.5 * DAY;
+  const X = t => L + (t - t0) * (W - L - R) / (t1 - t0), Y = v => T + (hi - v) * (H - T - B) / hi;
+  const bw = Math.max(3, Math.min(26, (W - L - R) / Math.max(rows.length, 1) * .7)), xs = rows.map(r => X(tOf(r)));
+  let s = `<svg viewBox="0 0 ${W} ${H}" width="${W}" height="${H}" role="img" tabindex="0" aria-label="Bags offered by grade, ${rows.length} sales. Use arrow keys to inspect.">`;
+  for (let i = 0; i <= 4; i++) { const v = hi * i / 4, y = Y(v); s += `<line x1="${L}" x2="${W - R}" y1="${y}" y2="${y}" stroke="var(--line)"/><text x="${L - 6}" y="${y + 4}" text-anchor="end" font-size="11" fill="var(--mute)">${kes0(v)}</text>`; }
+  for (const [t, label] of timeTicks(t0, t1, W)) s += `<text x="${X(t)}" y="${H - 8}" text-anchor="middle" font-size="11" fill="var(--mute)">${label}</text>`;
+  rows.forEach((r, i) => { let acc = 0; for (const st of vis) { const v = r.bags[st.k] || 0; s += `<rect x="${xs[i] - bw / 2}" y="${Y(acc + v)}" width="${bw}" height="${Y(acc) - Y(acc + v)}" fill="var(--${st.c})"/>`; acc += v; } });
+  wrap.innerHTML = s + '</svg>';
+  interact(wrap, wrap.querySelector('svg'), rows, xs, W, r =>
+    `<b class="d">${dLong(r.date)}</b><div class="s">Sale ${r.sale_no} · ${r.season}</div>` +
+    stacks.map(st => `<div class="r"><span>${st.name}</span><b>${kes0(r.bags[st.k])} bags</b></div>`).join('') + `<div class="r"><span>All grades</span><b>${kes0(r.total_bags)} bags</b></div>`,
+    r => [[Y(tot(r)), 'var(--accent)']], H, T, B);
+}
+
+function legend(id, chartId, items) {
+  const el = $('#' + id), h = hid(chartId);
+  el.innerHTML = items.map(([k, name, c]) => `<button type="button" class="lg" data-k="${k}" aria-pressed="${!h.has(k)}"><i style="background:var(--${c})"></i>${name}</button>`).join('');
+  el.querySelectorAll('button').forEach(b => b.onclick = () => { const k = b.dataset.k; h.has(k) ? h.delete(k) : h.add(k); render(); });
+}
+
+const basisText = r => r.estimated
+  ? `<div class="s">Estimated from the market average ($${usd(r.market_avg)}), about ±2%</div>`
+  : `<div class="s">From AA / AB / C averages (${r.source === 'nce' ? 'exchange report' : r.source === 'manual' ? 'entered by hand' : 'news write-up'})</div>`;
+
+function render() {
+  const st = P.status;
+  const nb = st.news_error ? ` · news: ${st.news_error}` : '';
+  $('#status').textContent = st.last_check ? `Last checked ${new Date(st.last_check).toLocaleString()}` + (st.error ? ` · error: ${st.error}` : '') + nb : 'Checking the exchange…';
+  if (A.empty) { $('#tiles').innerHTML = '<p class="msg">No data yet. The first fetch can take a minute.</p>'; return; }
+  const all = A.rows, S = A.summary, last = all[all.length - 1];
+
+  $('#latestTitle').textContent = `Latest estimate: Sale ${S.latest_sale} · ${dLong(S.latest_date)}`;
+  const trendTxt = {rising: '▲ Rising', falling: '▼ Falling', steady: '● Steady', unknown: '–'}[S.trend];
+  // Same week last year, for a year-on-year view
+  const target = tOf(last) - 364 * DAY;
+  const ly = all.filter(r => Math.abs(tOf(r) - target) <= 10 * DAY).sort((a, b) => Math.abs(tOf(a) - target) - Math.abs(tOf(b) - target))[0];
+  const yoy = ly ? (last.cherry - ly.cherry) / ly.cherry * 100 : null;
+  $('#tiles').innerHTML = [
+    ['Cherry, per kg', 'KES ' + kes(S.cherry), `<span class="${cls(S.change_vs_prev_kes)}">${sgn(S.change_vs_prev_kes)} (${sgn(S.change_vs_prev_pct)}%)</span> vs previous sale`],
+    ['Parchment, 50 kg', 'KES ' + kes0(last.parchment50), `4-sale avg: ${last.ma4 ? 'KES ' + kes(last.ma4) + '/kg cherry' : '–'}`],
+    ['Same week last year', ly ? `<span class="${cls(yoy)}">${sgn(yoy)}%</span>` : '–', ly ? `KES ${kes(ly.cherry)}/kg on ${dMid(ly.date)}${ly.estimated ? ' (est.)' : ''}` : 'no sale about a year back'],
+    ['Trend (last 6 sales)', trendTxt, S.trend_kes_per_sale == null ? '' : `${sgn(S.trend_kes_per_sale)} KES/kg per sale`],
+  ].map(([l, v, n]) => `<div class="tile"><div class="l">${l}</div><div class="v">${v}</div><div class="n">${n}</div></div>`).join('');
+
+  const bits = [];
+  bits.push(`Cherry is estimated at <b>KES ${kes(S.cherry)}/kg</b>, <span class="${cls(S.change_vs_prev_pct)}">${sgn(S.change_vs_prev_pct)}%</span> on the last sale and ${S.vs_ma4_pct == null ? 'n/a' : `<span class="${cls(S.vs_ma4_pct)}">${sgn(S.vs_ma4_pct)}%</span>`} vs its 4-sale average.`);
+  bits.push(`It sits at <b>${S.range_position_pct}%</b> of the range since ${dMid(S.first_date)} (low KES ${kes(S.low.cherry)} on ${dMid(S.low.date)}, high KES ${kes(S.high.cherry)} on ${dMid(S.high.date)}). The average over ${S.sales_count} sales is KES ${kes(S.avg_all)}.`);
+  if (S.volatility_pct != null) bits.push(`Typical sale-to-sale swing is about <b>±${S.volatility_pct}%</b>, roughly ±KES ${kes(S.cherry * S.volatility_pct / 100)} per kg of cherry.`);
+  if (A.next_sale_band) bits.push(`Indicative range for the next sale: <b>KES ${kes(A.next_sale_band.low)} – ${kes(A.next_sale_band.high)}</b> (centre ${kes(A.next_sale_band.mid)}). This is a guide from recent momentum, not a prediction.`);
+  const gs = A.grade_share_latest;
+  if (gs) bits.push(`Latest volume mix: AA ${gs.AA}%, AB ${gs.AB}%, C ${gs.C}% of the three grades. Weighting by these volumes would put the mix price ${sgn(S.volume_weighted_gap_pct)}% vs your simple average.`);
+  if (S.days_since_sale > 10) bits.push(`The last sale on record was ${S.days_since_sale} days ago. The exchange normally sells on Tuesdays, but there are seasonal breaks.`);
+  $('#read').innerHTML = bits.map(b => `<li>${b}</li>`).join('');
+  $('#gaps').textContent = A.gaps.length ? `No report found for: ${A.gaps.join(', ')}.` : '';
+  const c = A.calibration, cm = c.main, cl = c.late;
+  $('#method').textContent = S.estimated_count ? `${S.estimated_count} older sales state only the exchange’s overall market average. They are converted to a mix price using the usual ratio of market average to AA/AB/C mix: ${cm ? cm.ratio + ' in the main season (±' + cm.spread_pct + '%, from ' + cm.n + ' sales)' : ''}${cl ? ', ' + cl.ratio + ' late in the season (±' + cl.spread_pct + '%)' : ''}. Checked against the exchange’s own 2026 reports, news-derived averages were within about 1% on average.` : '';
+
+  const rows = inRange(all);
+  const band = A.next_sale_band;
+  legend('lgCherry', 'cCherry', [['est', 'Estimate', 'accent'], ['ma4', '4-sale avg', 'ab'], ['ma8', '8-sale avg', 'c'], ['band', 'Next-sale range', 'accent']]);
+  lineChart('cCherry', rows, {
+    label: 'Cherry price in KES per kg', band, dec: 0,
+    series: [
+      {k: 'est', name: 'Estimate', c: 'accent', get: r => r.cherry, w: 3, hollow: r => r.estimated},
+      {k: 'ma4', name: '4-sale avg', c: 'ab', get: r => r.ma4, w: 2, dash: true, dots: false},
+      {k: 'ma8', name: '8-sale avg', c: 'c', get: r => r.ma8, w: 2, dash: true, dots: false},
+    ],
+    tip: (r, i, b) => `<b class="d">${dLong(r.date)}</b><div class="s">Sale ${r.sale_no} · season ${r.season}</div>` +
+      `<div class="r"><span>Cherry</span><b>KES ${kes(r.cherry)}/kg</b></div>` +
+      (r.change_pct == null ? '' : `<div class="r"><span>vs previous</span><b class="${cls(r.change_pct)}">${sgn(r.change_kes)} (${sgn(r.change_pct)}%)</b></div>`) +
+      (r.ma4 ? `<div class="r"><span>4-sale avg</span><span>${kes(r.ma4)}</span></div>` : '') + (r.ma8 ? `<div class="r"><span>8-sale avg</span><span>${kes(r.ma8)}</span></div>` : '') +
+      `<div class="r"><span>Parchment 50 kg</span><span>KES ${kes0(r.parchment50)}</span></div><div class="r"><span>Mix price</span><span>$${usd(r.mix)}</span></div>` +
+      basisText(r) + (b ? `<div class="s">Next sale (indicative): KES ${kes(b.low)} – ${kes(b.high)}</div>` : ''),
+  });
+
+  legend('lgGrades', 'cGrades', [['AA', 'AA', 'aa'], ['AB', 'AB', 'ab'], ['C', 'C', 'c']]);
+  const gtip = r => `<b class="d">${dLong(r.date)}</b><div class="s">Sale ${r.sale_no} · ${r.season}</div>` + ['AA', 'AB', 'C'].map(g => `<div class="r"><span>${g}</span><b>${r[g] == null ? 'not stated' : '$' + usd(r[g])}</b></div>`).join('') + `<div class="r"><span>Market avg</span><span>${r.market_avg ? '$' + usd(r.market_avg) : '–'}</span></div>`;
+  lineChart('cGrades', rows, {label: 'Grade prices in USD per 50 kg', series: [
+    {k: 'AA', name: 'AA', c: 'aa', get: r => r.AA}, {k: 'AB', name: 'AB', c: 'ab', get: r => r.AB}, {k: 'C', name: 'C', c: 'c', get: r => r.C}], tip: gtip});
+  legend('lgSpread', 'cSpread', [['aa_ab', 'AA − AB', 'aa'], ['ab_c', 'AB − C', 'c']]);
+  lineChart('cSpread', rows, {label: 'Grade price spreads in USD', zero: true, series: [
+    {k: 'aa_ab', name: 'AA − AB', c: 'aa', get: r => r.grade_premium_aa_ab}, {k: 'ab_c', name: 'AB − C', c: 'c', get: r => r.grade_discount_ab_c}],
+    tip: r => `<b class="d">${dLong(r.date)}</b><div class="s">Sale ${r.sale_no} · ${r.season}</div><div class="r"><span>AA − AB</span><b>${r.grade_premium_aa_ab == null ? '–' : '$' + usd(r.grade_premium_aa_ab)}</b></div><div class="r"><span>AB − C</span><b>${r.grade_discount_ab_c == null ? '–' : '$' + usd(r.grade_discount_ab_c)}</b></div>`});
+  legend('lgVol', 'cVol', [['AA', 'AA', 'aa'], ['AB', 'AB', 'ab'], ['C', 'C', 'c']]);
+  barChart('cVol', rows, [{k: 'AA', name: 'AA', c: 'aa'}, {k: 'AB', name: 'AB', c: 'ab'}, {k: 'C', name: 'C', c: 'c'}]);
+
+  $('#monthly').innerHTML = '<tr><th>Month</th><th>Sales</th><th>Avg cherry KES/kg</th></tr>' + A.monthly.slice().reverse().map(m => `<tr><td>${fd(m.month + '-01', {month: 'short', year: 'numeric'})}</td><td>${m.sales}</td><td>${kes(m.avg_cherry)}</td></tr>`).join('');
+  $('#sens').innerHTML = '<tr><th>USD/KES</th>' + [-5, 0, 5].map(d => `<th>Deductions ${(P.settings.deduction_pct + d).toFixed(1)}%</th>`).join('') + '</tr>' +
+    A.sensitivity.map(row => `<tr><td>${row.fx} (${row.fx_pct > 0 ? '+' : ''}${row.fx_pct}%)</td>${row.cherry.map((v, j) => `<td class="heat ${row.fx_pct === 0 && j === 1 ? 'base' : ''}">${kes(v)}</td>`).join('')}</tr>`).join('');
+  $('#breakeven').innerHTML = 'To hold today’s KES price if the USD price falls: ' + A.breakeven.map(b => `${b.usd_drop_pct}% → rate ${b.needed_fx}`).join(' · ');
+  pay();
+
+  // Sale history: the original columns first (Sale, Date, AA, AB, C, Mix avg $, Parchment/50kg, Cherry/kg), new ones after.
+  const srcBadge = r => r.estimated ? `<span class="badge est" title="Estimated from the market average">news · est.</span>`
+    : r.source === 'nce' ? 'NCE' : r.source === 'manual' ? '<span class="badge" title="Entered by hand">manual</span>' : '<span class="badge">news</span>';
+  $('#hist').innerHTML = '<tr><th>Sale</th><th>Date</th><th>AA</th><th>AB</th><th>C</th><th>Mix avg $</th><th>Parchment/50kg KES</th><th>Cherry/kg KES</th><th>Season</th><th>Bags</th><th>Source</th></tr>' +
+    all.slice().reverse().map(x => `<tr><td>#${x.sale_no}</td><td>${dMid(x.date)}</td><td>${usd(x.AA)}</td><td>${usd(x.AB)}</td><td>${usd(x.C)}</td><td>${usd(x.mix)}</td><td>${kes0(x.parchment50)}</td><td>${kes(x.cherry)}</td><td>${x.season}</td><td>${kes0(x.total_bags)}</td><td>${x.url ? `<a href="${esc(x.url)}" target="_blank" rel="noopener noreferrer">${srcBadge(x)}</a>` : srcBadge(x)}</td></tr>`).join('');
+
+  for (const [k, v] of Object.entries(P.settings)) { const i = document.querySelector(`[name=${k}]`); if (i && document.activeElement !== i) i.value = v; }
+
+  try {
+    const seen = localStorage.getItem('lastSeenSale') || '';
+    const key = S.latest_date;
+    if (seen && key > seen) { const b = $('#banner'); b.style.display = 'block'; b.textContent = `New sale: #${S.latest_sale} on ${dLong(S.latest_date)}. Cherry is KES ${kes(S.cherry)}/kg, ${sgn(S.change_vs_prev_pct)}% vs the previous sale.`; }
+    localStorage.setItem('lastSeenSale', key);
+  } catch (e) {}
+}
+
+function renderRanges() {
+  $('#ranges').innerHTML = RANGES.map(([k, l]) => `<button type="button" class="chip" data-r="${k}" aria-pressed="${ui.range === k}">${l}</button>`).join('');
+  $('#ranges').querySelectorAll('button').forEach(b => b.onclick = () => { ui.range = b.dataset.r; try { localStorage.setItem('range', ui.range); } catch (e) {} renderRanges(); if (A) render(); });
+}
+
+function pay() {
+  if (!A || A.empty) return;
+  const kg = parseFloat($('#kg').value) || 0, c = A.summary.cherry, b = A.next_sale_band;
+  $('#payNow').textContent = 'KES ' + kes0(kg * c);
+  $('#payBand').textContent = b ? `Next-sale range for the same weight: KES ${kes0(kg * b.low)} – ${kes0(kg * b.high)}` : '';
+}
+
+async function load() {
+  [P, A] = await Promise.all([fetch('/api/prices').then(r => r.json()), fetch('/api/analysis').then(r => r.json())]);
+  render();
+}
+$('#kg').addEventListener('input', pay);
+let rt; addEventListener('resize', () => { clearTimeout(rt); rt = setTimeout(() => { if (A) render(); }, 150); });
+$('#settings').addEventListener('submit', async ev => {
+  ev.preventDefault();
+  const body = Object.fromEntries([...new FormData(ev.target)].map(([k, v]) => [k, parseFloat(v)]));
+  const r = await fetch('/api/settings', {method: 'PUT', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(body)});
+  $('#saved').textContent = r.ok ? 'Saved' : 'Invalid values';
+  if (r.ok) load();
+});
+$('#refresh').addEventListener('click', async () => {
+  const b = $('#refresh'); b.disabled = true; b.textContent = 'Checking…';
+  await fetch('/api/refresh', {method: 'POST'}); await load();
+  b.disabled = false; b.textContent = 'Check for new sale';
+});
+renderRanges(); load(); setInterval(load, 5 * 60 * 1000);
+</script>
+</body>
+</html>

@@ -1,0 +1,8 @@
+# Automatic HTTPS (Let's Encrypt) for $DOMAIN, with a login in front of the app.
+{$DOMAIN} {
+	encode gzip
+	basic_auth {
+		{$BASIC_AUTH_USER} {$BASIC_AUTH_HASH}
+	}
+	reverse_proxy app:8100
+}

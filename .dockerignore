@@ -1,0 +1,10 @@
+prices.db
+*.db
+__pycache__/
+**/__pycache__/
+.pytest_cache/
+tests/
+deploy/
+.git
+.env
+*.md

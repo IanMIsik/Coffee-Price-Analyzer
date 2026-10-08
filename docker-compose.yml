@@ -1,0 +1,38 @@
+# Default:            docker compose up -d -> app on 127.0.0.1:8100 (reach it with an SSH tunnel)
+# With HTTPS + login: docker compose --profile https up -d -> Caddy on 80/443 in front (needs DOMAIN, BASIC_AUTH_* in .env)
+services:
+  app:
+    build: .
+    image: price-analyzer:latest
+    restart: unless-stopped
+    environment:
+      PA_POLL_MINUTES: ${PA_POLL_MINUTES:-30}
+      PA_NEWS_HOURS: ${PA_NEWS_HOURS:-12}
+    volumes:
+      - pa_data:/data
+    ports:
+      - "127.0.0.1:8100:8100"   # localhost only; never published to the internet directly
+
+  caddy:
+    image: caddy:2
+    profiles: ["https"]
+    restart: unless-stopped
+    depends_on:
+      app:
+        condition: service_healthy
+    environment:
+      DOMAIN: ${DOMAIN:?set DOMAIN in .env}
+      BASIC_AUTH_USER: ${BASIC_AUTH_USER:?set BASIC_AUTH_USER in .env}
+      BASIC_AUTH_HASH: ${BASIC_AUTH_HASH:?set BASIC_AUTH_HASH in .env}
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./deploy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+
+volumes:
+  pa_data:
+  caddy_data:
+  caddy_config:
