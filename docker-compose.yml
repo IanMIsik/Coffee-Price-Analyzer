@@ -1,5 +1,5 @@
 # Default:            docker compose up -d -> app on 127.0.0.1:8100 (reach it with an SSH tunnel)
-# With HTTPS + login: docker compose --profile https up -d -> Caddy on 80/443 in front (needs DOMAIN, BASIC_AUTH_* in .env)
+# With HTTPS:         docker compose --profile https up -d -> Caddy on 80/443 in front (needs DOMAIN in .env; no login)
 services:
   app:
     build: .
@@ -22,8 +22,6 @@ services:
         condition: service_healthy
     environment:
       DOMAIN: ${DOMAIN:?set DOMAIN in .env}
-      BASIC_AUTH_USER: ${BASIC_AUTH_USER:?set BASIC_AUTH_USER in .env}
-      BASIC_AUTH_HASH: ${BASIC_AUTH_HASH:?set BASIC_AUTH_HASH in .env}
     ports:
       - "80:80"
       - "443:443"

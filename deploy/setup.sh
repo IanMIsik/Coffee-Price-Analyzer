@@ -3,10 +3,11 @@
 #   git clone https://github.com/IanMIsik/Coffee-Price-Analyzer.git && cd Coffee-Price-Analyzer && ./deploy/setup.sh
 # After that, to update:  git pull && ./deploy/setup.sh      (re-running is safe; it keeps your settings)
 #
-# It: installs Docker if needed, asks for your DuckDNS name/token and a dashboard login (first run only), keeps the
-# DuckDNS address pointing at this server, starts the app behind HTTPS, and makes it start on boot and update nightly.
+# It: installs Docker if needed, asks for your DuckDNS name/token (first run only), keeps the DuckDNS address
+# pointing at this server, starts the app behind HTTPS, and makes it start on boot and update nightly.
+# There is no login: anyone with the address can open the dashboard and change the conversion settings.
 #
-# Non-interactive use: set DUCKDNS_SUBDOMAIN, DUCKDNS_TOKEN, APP_USER, APP_PASSWORD in the environment.
+# Non-interactive use: set DUCKDNS_SUBDOMAIN and DUCKDNS_TOKEN in the environment.
 # Flags: --reconfigure (ask the questions again)   --config-only (write .env and stop; for testing)
 set -euo pipefail
 
@@ -37,7 +38,7 @@ install_docker() {
     ubuntu|debian)
       say "Installing Docker"
       apt-get update -y
-      apt-get install -y ca-certificates curl git openssl
+      apt-get install -y ca-certificates curl git
       curl -fsSL https://get.docker.com | sh
       ;;
     *)
@@ -79,9 +80,6 @@ ask() {          # ask VAR "Prompt" [default] [secret]
 
 DUCKDNS_SUBDOMAIN="${DUCKDNS_SUBDOMAIN:-$(getenvfile DUCKDNS_SUBDOMAIN)}"
 DUCKDNS_TOKEN="${DUCKDNS_TOKEN:-$(getenvfile DUCKDNS_TOKEN)}"
-APP_USER="${APP_USER:-$(getenvfile BASIC_AUTH_USER)}"
-APP_PASSWORD="${APP_PASSWORD:-}"
-HASH="$(getenvfile BASIC_AUTH_HASH)"
 FIRST_RUN=0
 [ -f .env ] || FIRST_RUN=1
 
@@ -95,13 +93,7 @@ if [ "$FIRST_RUN" -eq 1 ] || [ "$RECONFIGURE" -eq 1 ]; then
       if [ -n "$DUCKDNS_TOKEN" ]; then echo "  received ${#DUCKDNS_TOKEN} characters"; else echo "  nothing received, try again"; fi
     done
   fi
-  [ -n "$APP_USER" ] || ask APP_USER "Dashboard login name" "admin"
-  if [ -z "$APP_PASSWORD" ]; then
-    ask APP_PASSWORD "Dashboard password (hidden; press Enter to generate one)" "" secret
-  fi
-  HASH=""   # recomputed below
 fi
-APP_USER="${APP_USER:-admin}"
 DUCKDNS_SUBDOMAIN="${DUCKDNS_SUBDOMAIN%.duckdns.org}"
 
 if [ -n "$DUCKDNS_SUBDOMAIN" ] && [ -z "$DUCKDNS_TOKEN" ]; then
@@ -110,17 +102,7 @@ if [ -n "$DUCKDNS_SUBDOMAIN" ] && [ -z "$DUCKDNS_TOKEN" ]; then
   exit 1
 fi
 
-GENERATED=0
-if [ -z "$HASH" ]; then
-  if [ -z "$APP_PASSWORD" ]; then
-    APP_PASSWORD="$(openssl rand -base64 24 | tr -dc 'A-Za-z0-9' | head -c 16)"
-    GENERATED=1
-  fi
-  HASH="$(docker run --rm caddy:2 caddy hash-password --plaintext "$APP_PASSWORD")"
-fi
-
 if [ -n "$DUCKDNS_SUBDOMAIN" ]; then
-  [ -n "$DUCKDNS_TOKEN" ] || { echo "A DuckDNS token is required with a DuckDNS name." >&2; exit 1; }
   DOMAIN="${DUCKDNS_SUBDOMAIN}.duckdns.org"
   AUTO_HOST=0
 else
@@ -138,8 +120,6 @@ DOMAIN=${DOMAIN}
 AUTO_HOST=${AUTO_HOST}
 DUCKDNS_SUBDOMAIN=${DUCKDNS_SUBDOMAIN}
 DUCKDNS_TOKEN=${DUCKDNS_TOKEN}
-BASIC_AUTH_USER=${APP_USER}
-BASIC_AUTH_HASH='${HASH}'
 PA_POLL_MINUTES=${POLL:-30}
 PA_NEWS_HOURS=${NEWS:-12}
 ENV
@@ -202,10 +182,5 @@ echo
 echo "=============================================================="
 echo " App health : $state"
 echo " Address    : https://${HOST}   (allow a minute for the HTTPS certificate)"
-echo " Login      : ${APP_USER}"
-if [ "$GENERATED" -eq 1 ]; then
-  echo " Password   : ${APP_PASSWORD}   <- shown once; save it now"
-else
-  echo " Password   : (the one you chose; run with --reconfigure to change it)"
-fi
+echo " Login      : none (anyone with the address can open it)"
 echo "=============================================================="

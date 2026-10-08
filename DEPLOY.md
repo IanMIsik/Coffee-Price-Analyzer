@@ -3,9 +3,10 @@
 The app is one container (FastAPI + SQLite + a background poller). The database lives in a Docker volume, so
 rebuilds and updates keep your data and settings.
 
-> **Important:** the app has no login of its own, and anyone who can reach it can change your conversion settings.
-> Never open port 8100 to the internet. The setups below put HTTPS and a password in front of it (Caddy), or keep it
-> private behind an SSH tunnel.
+> **Important:** the app has no login. With the one-script setup, anyone who knows the address can open the dashboard
+> and change the conversion settings (they are shared, so a change shows for everyone). Share the address only with
+> people you trust. Never open port 8100 itself to the internet; the setups below put HTTPS (Caddy) in front of it,
+> or keep it private behind an SSH tunnel.
 
 ## Quick start: one script (recommended)
 
@@ -34,8 +35,6 @@ It asks:
 |---|---|
 | DuckDNS name | e.g. `mycoffee` (or `mycoffee.duckdns.org`). Press Enter to skip and get a free `<ip>.sslip.io` address instead. |
 | DuckDNS token | from the top of your duckdns.org page (typed hidden) |
-| Dashboard login name | e.g. `admin` |
-| Dashboard password | choose one, or press Enter to generate one (shown once at the end) |
 
 When it finishes it prints the address, for example `https://mycoffee.duckdns.org`. Allow a minute for the HTTPS
 certificate, and a minute or two for the first load to fetch the sales history.
@@ -48,7 +47,7 @@ git pull
 ./deploy/setup.sh
 ```
 
-It does not ask the questions again. To change the DuckDNS name or the password, add `--reconfigure`.
+It does not ask the questions again. To change the DuckDNS name or token, add `--reconfigure`.
 
 **Already ran an earlier automatic setup on this server?** The new script takes over the same containers and data
 (they share the project name `price-analyzer`). If you have a leftover copy in `/opt/price-analyzer`, delete it after:
@@ -68,12 +67,12 @@ It does not ask the questions again. To change the DuckDNS name or the password,
 ```bash
 sudo docker compose ps                  # status and health
 sudo docker compose logs -f app         # watch it check for new sales
-sudo ./deploy/setup.sh --reconfigure    # change the DuckDNS name or the password
+sudo ./deploy/setup.sh --reconfigure    # change the DuckDNS name or token
 ```
 
 **Alternative: a brand-new instance that sets itself up.** Paste `deploy/user-data.sh` (with your DuckDNS values filled
 in at the top) into **Launch instance → Advanced details → User data**. It clones the repository and runs the same
-`setup.sh`. The generated password appears in **Actions → Monitor and troubleshoot → Get system log**. Note that
+`setup.sh`. The address appears in **Actions → Monitor and troubleshoot → Get system log**. Note that
 user data is visible to anyone with access to the instance in your AWS account, including the DuckDNS token you put in it.
 
 **Free tier:** AWS's free offer has changed over time (a 12-month trial on older accounts, a credit-based plan on newer
@@ -91,7 +90,7 @@ ways to reach the app:
 | | Access | Needs a domain | Good for |
 |---|---|---|---|
 | **A. SSH tunnel** (default) | `http://localhost:8100` on your computer, through SSH | No | Just you, simplest and safest |
-| **B. HTTPS + login** | `https://prices.yourdomain.com` | Yes | Sharing with colleagues or opening it on a phone |
+| **B. HTTPS** | `https://prices.yourdomain.com` | Yes | Sharing with colleagues or opening it on a phone |
 
 ## 1. Launch the instance
 
@@ -140,19 +139,18 @@ ssh -i /path/to/key.pem -L 8100:localhost:8100 ubuntu@<ELASTIC_IP>
 
 Leave that running and open http://localhost:8100.
 
-## 4. Option B: HTTPS with a login
+## 4. Option B: HTTPS
 
 1. In your DNS provider, create an **A record** `prices.yourdomain.com → <ELASTIC_IP>` and wait for it to resolve.
-2. On the server, create the password hash and the settings file:
+2. On the server, create the settings file:
 
    ```bash
    ssh -i /path/to/key.pem ubuntu@<ELASTIC_IP>
    cd ~/price-analyzer
-   sudo docker run --rm caddy:2 caddy hash-password --plaintext 'choose-a-strong-password'
    cp .env.example .env && nano .env
    ```
 
-   Set `DOMAIN`, `BASIC_AUTH_USER`, and paste the hash into `BASIC_AUTH_HASH` (keep the single quotes).
+   Set `DOMAIN` to your domain.
 3. Redeploy from your computer. The script sees `DOMAIN` in the server's `.env` and starts Caddy too:
 
    ```bash

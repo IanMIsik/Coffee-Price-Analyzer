@@ -7,19 +7,18 @@
 # Use Ubuntu Server 24.04 LTS. Fill in the DuckDNS values to use your own duckdns.org address; leave them empty
 # to get a free <ip>.sslip.io address instead. Note: User data is readable by anyone with access to the instance
 # in your AWS account, so the DuckDNS token set here is visible there.
+# The app has no login: anyone with the address can open the dashboard.
 # =====================================================================================================
 REPO_URL="https://github.com/IanMIsik/Coffee-Price-Analyzer.git"
 DUCKDNS_SUBDOMAIN=""      # e.g. mycoffee   (becomes mycoffee.duckdns.org)
 DUCKDNS_TOKEN=""
-APP_USER="admin"
-APP_PASSWORD=""           # empty = generate one (printed in the system log)
 
 set -euo pipefail
 exec > >(tee -a /var/log/price-analyzer-setup.log) 2>&1
 export DEBIAN_FRONTEND=noninteractive
 apt-get update -y
-apt-get install -y git curl ca-certificates openssl
+apt-get install -y git curl ca-certificates
 git clone "$REPO_URL" /opt/price-analyzer
 cd /opt/price-analyzer
-export DUCKDNS_SUBDOMAIN DUCKDNS_TOKEN APP_USER APP_PASSWORD
+export DUCKDNS_SUBDOMAIN DUCKDNS_TOKEN
 bash deploy/setup.sh
