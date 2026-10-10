@@ -177,6 +177,25 @@ def seen_ok_ids() -> set[int]:
         return {r["report_id"] for r in c.execute("SELECT report_id FROM seen_reports WHERE status = 'ok'")}
 
 
+def get_meta(key: str) -> str | None:
+    with conn() as c:
+        r = c.execute("SELECT value FROM settings WHERE key = ?", ("meta:" + key,)).fetchone()
+    return r["value"] if r else None
+
+
+def set_meta(key: str, value: str):
+    with conn() as c:
+        c.execute(
+            "INSERT INTO settings(key, value) VALUES(?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value",
+            ("meta:" + key, value),
+        )
+
+
+def reset_seen_posts():
+    with conn() as c:
+        c.execute("DELETE FROM seen_posts")
+
+
 def mark_post(post_id: int, title: str, status: str):
     with conn() as c:
         c.execute(

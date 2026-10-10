@@ -107,3 +107,20 @@ def test_new_season_first_sale_rolls_over(tmpdb):
     a = analyse(sales, DEFAULT_SETTINGS)
     assert a["summary"]["latest_date"] == "2026-10-13" and a["rows"][-1]["season"] == "2026/27"
     assert a["rows"][-1]["change_pct"] > 0
+
+
+def test_share_style_grades_and_reparse_on_version_change(tmpdb, monkeypatch):
+    text = ("Sale 1 of the new season cleared 17,084 bags. The average price was $293 per 50kg bag. "
+            "AB made up 41% of volume and averaged $325. AA contributed 16% at $338, the highest average of any grade. "
+            "C accounted for 14% at $296, and PB for 5% at $322, so these four grades together made up 76%. "
+            "Muguna FCS's Nchoroiboro AA fetched $382, bought by Sondhi Trading.")
+    assert news.grade_averages(text) == {"AB": 325.0, "AA": 338.0, "C": 296.0}
+    assert news.market_average(text) == 293.0
+
+    db = tmpdb
+    db.mark_post(1, "x", "ok")
+    db.set_meta("news_parser_version", "old")
+    monkeypatch.setattr(news, "fetch_posts", lambda *a, **k: [])
+    news.sync()                                   # version changed -> previously seen posts are forgotten
+    assert db.seen_post_ids() == set() and db.get_meta("news_parser_version") == news.PARSER_VERSION
+    assert db.get_settings()["usd_kes"] == 129.0  # meta rows do not leak into the real settings

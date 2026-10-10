@@ -17,6 +17,8 @@ from .parser import GradeRow, Sale
 
 API = "https://kilimonews.co.ke/wp-json/wp/v2/posts"
 HEADERS = {"User-Agent": "FactoryPriceAnalyzer/1.0 (internal price tracking)"}
+# Bump when the extraction rules change: articles are then read again with the new rules.
+PARSER_VERSION = "2"
 START = "2025-06-25T00:00:00"  # roughly "up to last year", plus the tail of the previous season
 log = logging.getLogger("news")
 
@@ -37,8 +39,11 @@ _ANY_GRADE = re.compile(r"\b(AA|AB)\b|\bC[- ]grade\b|\bgrade[- ]C\b")
 _GRADE_TOKENS = {
     "AA": r"\bAA\b",
     "AB": r"\bAB\b",
-    "C": r"\bC[- ]grade\b|\bgrade[- ]C\b",
+    # "C grade", "grade C", or a bare "C" followed by a verb ("C accounted for 14% at $296")
+    "C": r"\bC[- ]grade\b|\bgrade[- ]C\b|\bC\b(?=\s+(?:accounted|contributed|made up|came|represented|at|averaged|fetched)\b)",
 }
+# "AA contributed 16% at $338": a grade, its share of volume, then its price (no "average" before the price).
+_SHARE_STYLE = r"{g}\b[^$%.;]{{0,40}}?\d{{1,3}}(?:\.\d+)?%\s*(?:of\s+\w+\s+)?(?i:at|averaging|averaged|fetching)\s*"
 _CLAUSE_SPLIT = re.compile(r",?\s*\b(?:while|followed by|whereas)\s+|;|,\s+and\s+(?=AA\b|AB\b|C[- ]grade|grade[- ]C)")
 
 
@@ -115,6 +120,8 @@ def grade_averages(text: str) -> dict[str, float]:
                 continue
             if not m and explicit_before and not _NOT_MARKET.search(clause):  # 'AA averaged 463, while AB fetched 431'
                 m = re.search(r"\b(?:fetch\w*|at)\s+" + _PRICE, clause, re.I)
+            if not m:  # 'AA contributed 16% at $338'
+                m = re.search(_SHARE_STYLE.format(g=re.escape(g)) + _PRICE, clause)
             if m and g not in out and 150 <= float(m.group(1)) <= 700:
                 out[g] = float(m.group(1))
             explicit_before = bool(m)
@@ -191,6 +198,9 @@ def to_sale(ns: NewsSale) -> Sale:
 
 
 def sync() -> dict:
+    if db.get_meta("news_parser_version") != PARSER_VERSION:
+        db.reset_seen_posts()
+        db.set_meta("news_parser_version", PARSER_VERSION)
     seen = db.seen_post_ids()
     posts = [p for p in fetch_posts() if p["id"] not in seen]
     parsed: list[tuple[dict, NewsSale]] = []
